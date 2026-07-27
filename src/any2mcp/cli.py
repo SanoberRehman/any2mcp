@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        server, functions = build_server(
+        result = build_server(
             args.target,
             name=args.name,
             include=args.include,
@@ -86,7 +86,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"any2mcp: {exc}", file=sys.stderr)
         return 2
 
-    if not functions:
+    for skip in result.skipped:
+        print(
+            f"any2mcp: skipping {skip.name!r} (unsupported signature: {skip.reason})",
+            file=sys.stderr,
+        )
+
+    if not result.registered:
         print(
             f"any2mcp: no exposable functions found in {args.target!r}.\n"
             "  Hint: functions must be public (no leading underscore) and defined\n"
@@ -96,15 +102,15 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     if args.list:
-        _print_tool_list(server)
+        _print_tool_list(result.server)
         return 0
 
     print(
-        f"any2mcp: serving {len(functions)} tool(s) from {args.target!r} "
+        f"any2mcp: serving {len(result.registered)} tool(s) from {args.target!r} "
         f"over {args.transport}",
         file=sys.stderr,
     )
-    server.run(transport=args.transport)
+    result.server.run(transport=args.transport)
     return 0
 
 

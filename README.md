@@ -71,6 +71,9 @@ pip install any2mcp
 uv tool install any2mcp
 ```
 
+> Not yet on PyPI? Install straight from source:
+> `uv tool install "git+https://github.com/SanoberRehman/any2mcp"`
+
 ## Quickstart
 
 Inspect what would be exposed — no server needed:
