@@ -46,8 +46,11 @@ target-version = "py311"
 
 [tool.ruff.lint.per-file-ignores]
 # Fixtures deliberately use legacy typing (Optional/Union) and odd shapes to
-# prove the schema generator handles them; don't "modernize" them away.
-"tests/fixtures/*" = ["UP", "F401", "ANN"]
+# prove the schema generator handles them; don't "modernize" them away. Some
+# also contain deliberately dangerous calls (os.system, eval, rmtree) that the
+# risk analyzer is meant to detect, so the safety lints must not "fix" them.
+# Most are never executed at all - they exist to be parsed.
+"tests/fixtures/*" = ["UP", "F401", "ANN", "S", "PLW1510"]
 
 [build-system]
 requires = ["uv_build>=0.10.0,<0.11.0"]

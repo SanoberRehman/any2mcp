@@ -14,13 +14,16 @@ function costs one tool — never the whole server.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import ModuleType
 
 from mcp.server.fastmcp import FastMCP
 
+from .audit import AuditLog
 from .discover import Discovered, discover_functions
 from .loader import load_module
+from .policy import Decision, Policy
+from .risk import FunctionRisk, analyze
 
 
 @dataclass(frozen=True)
@@ -34,6 +37,12 @@ class BuildResult:
     server: FastMCP
     registered: list[Discovered]
     skipped: list[Skipped]
+    decisions: list[Decision] = field(default_factory=list)
+    risks: dict[str, FunctionRisk] = field(default_factory=dict)
+
+    @property
+    def blocked(self) -> list[Decision]:
+        return [d for d in self.decisions if d.blocked]
 
     # Preserve tuple-unpacking ergonomics: ``server, funcs = build_server(...)``.
     def __iter__(self):
@@ -46,16 +55,29 @@ def build_server(
     name: str | None = None,
     include: list[str] | None = None,
     exclude: list[str] | None = None,
+    policy: Policy | None = None,
+    audit: AuditLog | None = None,
 ) -> BuildResult:
-    """Build an MCP server exposing the public functions of *target*.
+    """Build an MCP server exposing the permitted public functions of *target*.
+
+    Functions the *policy* blocks are never registered, so they are absent from
+    ``tools/list`` entirely — see :mod:`any2mcp.policy` for why that, rather
+    than a call-time refusal, is the enforcement point.
 
     Returns a :class:`BuildResult`. It also unpacks as ``(server, registered)``
     for convenience.
     """
+    policy = policy or Policy()
+    audit = audit or AuditLog(None)
+
     module, selector = load_module(target)
     functions = discover_functions(
         module, selector=selector, include=include, exclude=exclude
     )
+
+    risks = analyze(module, [item.name for item in functions])
+    decisions = [policy.decide(risks[item.name]) for item in functions]
+    verdict = {d.name: d for d in decisions}
 
     server_name = name or _default_name(module)
     server = FastMCP(server_name)
@@ -63,14 +85,27 @@ def build_server(
     registered: list[Discovered] = []
     skipped: list[Skipped] = []
     for item in functions:
+        decision = verdict[item.name]
+        if decision.blocked:
+            audit.record_blocked(
+                item.name, decision.reason, decision.risk.level.label
+            )
+            continue
+        instrumented = audit.wrap(item.func, item.name, decision.risk.level.label)
         try:
-            server.add_tool(item.func, name=item.name)
+            server.add_tool(instrumented, name=item.name)
         except Exception as exc:  # noqa: BLE001 - isolate one bad signature
             skipped.append(Skipped(name=item.name, reason=_short_reason(exc)))
         else:
             registered.append(item)
 
-    return BuildResult(server=server, registered=registered, skipped=skipped)
+    return BuildResult(
+        server=server,
+        registered=registered,
+        skipped=skipped,
+        decisions=decisions,
+        risks=risks,
+    )
 
 
 def _short_reason(exc: Exception) -> str:
