@@ -1,0 +1,19 @@
+# Weekly dependency updates. Minor and patch bumps are grouped so the
+# 9-job CI matrix runs once per week; majors open on their own.
+#
+# The runtime dependency is `mcp>=1.2,<2`. Dependabot will not cross the
+# <2 ceiling; mcp 2.x is a deliberate migration (FastMCP -> MCPServer,
+# test helper removed), tracked separately.
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
