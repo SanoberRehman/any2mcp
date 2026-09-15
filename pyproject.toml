@@ -62,5 +62,5 @@ target-version = "py311"
 "tests/fixtures/*" = ["UP", "F401", "ANN", "S", "PLW1510"]
 
 [build-system]
-requires = ["uv_build>=0.10.0,<0.11.0"]
+requires = ["uv_build>=0.10.0,<0.13.0"]
 build-backend = "uv_build"
